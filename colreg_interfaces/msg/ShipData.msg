@@ -1,4 +1,5 @@
 std_msgs/Header header
+string  situation
 float32 tcpa
 float32 dcpa
 float32 collision_point_x
