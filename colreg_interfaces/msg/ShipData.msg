@@ -1,0 +1,11 @@
+std_msgs/Header header
+float32 tcpa
+float32 dcpa
+float32 collision_point_x
+float32 collision_point_y
+float32 x_target
+float32 y_target
+float32 x_own
+float32 y_own
+float32 theta_target
+float32 theta_own

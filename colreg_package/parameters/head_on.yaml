@@ -1,0 +1,11 @@
+/**:
+  ros__parameters:
+    x_tel: 0.0
+    y_tel: 5.5
+    theta_tel: 0.01
+    x_spawn: 11.0
+    y_spawn: 5.5
+    theta_spawn: 3.15
+
+
+
