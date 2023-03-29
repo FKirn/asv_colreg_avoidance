@@ -15,7 +15,9 @@ class TcpaDcpa(Node):
         self.own_lin_vel = 0.0
         self.own_vel_x = 0.0
         self.own_vel_y = 0.0
-
+        self.own_pose_x = 0.0
+        self.own_pose_y = 0.0
+        self.own_pose_theta = 0.0
         self.own_ship_pose_subscriber_ = self.create_subscription(Pose, "/own_ship/pose", self.own_pose_callback, 10)
 
         self.trgShipsData = {}
@@ -41,17 +43,16 @@ class TcpaDcpa(Node):
 
     def trg_pose_callback(self, data, index):
 
-        trg_ship_name = "trg_ship" + str(index)
-        print(trg_ship_name)
+        trg_ship_name = "trg_ship_" + str(index)
 
         if trg_ship_name not in self.trgShipsData:
-            self.trgShipsData.update(self.createShipDataDict(data))
+            self.trgShipsData.setdefault(trg_ship_name, {}).update(self.createShipDataDict(data, index))
         else:
             self.updateShipDataDict(trg_ship_name, data)
 
         self.calculate_publish(trg_ship_name)
 
-    def createShipDataDict(self, data):
+    def createShipDataDict(self, data, index):
         trg_pose_x = data.x
         trg_pose_y = data.y
         trg_theta = data.theta
@@ -59,54 +60,57 @@ class TcpaDcpa(Node):
         trg_vel_x = self.calculate_velocity_x(trg_lin_vel, trg_theta)
         trg_vel_y = self.calculate_velocity_y(trg_lin_vel, trg_theta)
 
-        return {"trg_pose_x": trg_pose_x, "trg_pose_y": trg_pose_y, "trg_theta": trg_theta,
-                "trg_lin_vel": trg_lin_vel, "trg_vel_x": trg_vel_x, "trg_vel_y": trg_vel_y}
+        return {'index': index,'trg_pose_x': trg_pose_x, 'trg_pose_y': trg_pose_y, 'trg_theta': trg_theta,
+                'trg_lin_vel': trg_lin_vel, 'trg_vel_x': trg_vel_x, 'trg_vel_y': trg_vel_y}
 
     def updateShipDataDict(self, trg_ship_name, data):
-        self.trgShipsData[trg_ship_name]["trg_pose_x"] = data.x
-        self.trgShipsData[trg_ship_name]["trg_pose_y"] = data.y
-        self.trgShipsData[trg_ship_name]["trg_theta"] = data.theta
-        self.trgShipsData[trg_ship_name]["trg_lin_vel"] = data.linear_velocity
-        self.trgShipsData[trg_ship_name]["trg_vel_x"] = self.calculate_velocity_x(data.linear_velocity, data.theta)
-        self.trgShipsData[trg_ship_name]["trg_vel_y"] = self.calculate_velocity_y(data.linear_velocity, data.theta)
+        self.trgShipsData[trg_ship_name]['trg_pose_x'] = data.x
+        self.trgShipsData[trg_ship_name]['trg_pose_y'] = data.y
+        self.trgShipsData[trg_ship_name]['trg_theta'] = data.theta
+        self.trgShipsData[trg_ship_name]['trg_lin_vel'] = data.linear_velocity
+        self.trgShipsData[trg_ship_name]['trg_vel_x'] = self.calculate_velocity_x(data.linear_velocity, data.theta)
+        self.trgShipsData[trg_ship_name]['trg_vel_y'] = self.calculate_velocity_y(data.linear_velocity, data.theta)
 
     def calculate_publish(self, trg_ship_name):
 
         self.calculate_tcpa_dcpa(trg_ship_name)
+
         if self.determine_collision_risk(trg_ship_name):
-            self.calculate_collision_point(trg_ship_name, self.own_vel_x, self.own_vel_y, self.own_pose.x, self.own_pose.y, self.trgShipsData[trg_ship_name]["tcpa"])
+            print("Rizik od sudara")
+            self.calculate_collision_point(trg_ship_name, self.own_vel_x, self.own_vel_y, self.own_pose.x, self.own_pose.y, self.trgShipsData[trg_ship_name]['tcpa'])
             self.determine_avoidance_scenario(trg_ship_name)
-        self.publish_ship_data(self.trgShipsData[trg_ship_name]["scenario"], self.trgShipsData[trg_ship_name]["tcpa"], self.trgShipsData[trg_ship_name]["dcpa"],
-                               self.trgShipsData[trg_ship_name]["collision_point_x"], self.trgShipsData[trg_ship_name]["collision_point_y"],
-                               self.trgShipsData[trg_ship_name]["trg_pose_x"], self.trgShipsData[trg_ship_name]["trg_pose_y"],
-                               self.own_pose_x, self.own_pose_y, self.trgShipsData[trg_ship_name]["trg_theta"], self.own_pose_theta)
+        else:
+            self.trgShipsData[trg_ship_name]['collision_point_x'] = 0.0
+            self.trgShipsData[trg_ship_name]['collision_point_y'] = 0.0
+        self.publish_ship_data(trg_ship_name, self.trgShipsData[trg_ship_name]['scenario'], self.trgShipsData[trg_ship_name]['tcpa'], self.trgShipsData[trg_ship_name]['dcpa'],
+                               self.trgShipsData[trg_ship_name]['collision_point_x'], self.trgShipsData[trg_ship_name]['collision_point_y'],
+                               self.trgShipsData[trg_ship_name]['trg_pose_x'], self.trgShipsData[trg_ship_name]['trg_pose_y'],
+                               self.own_pose_x, self.own_pose_y, self.trgShipsData[trg_ship_name]['trg_theta'], self.own_pose_theta)
 
     def calculate_tcpa_dcpa(self, trg_ship_name):
-        x_t = self.trgShipsData[trg_ship_name]["trg_pose_x"]
-        y_t = self.trgShipsData[trg_ship_name]["trg_pose_y"]
-        x_t_vel = self.trgShipsData[trg_ship_name]["trg_vel_x"]
-        y_t_vel = self.trgShipsData[trg_ship_name]["trg_vel_y"]
+        x_t = self.trgShipsData[trg_ship_name]['trg_pose_x']
+        y_t = self.trgShipsData[trg_ship_name]['trg_pose_y']
+        x_t_vel = self.trgShipsData[trg_ship_name]['trg_vel_x']
+        y_t_vel = self.trgShipsData[trg_ship_name]['trg_vel_y']
 
         x_o = self.own_pose.x
         y_o = self.own_pose.y
         x_o_vel = self.own_vel_x
         y_o_vel = self.own_vel_y
-
         # dcpa - udaljenost izmedu own broda i tocke u kojoj bi brodovi trebali biti najblizi jedan drugom temeljeno na trenutnim brzinama i smjerovima kretanja
         # tcpa - vrijeme potrebno da se dode do tocke u kojoj bi brodovi trebali biti najblizi jedan drugom temeljeno na trenutnim brzinama i smjerovima kretanja
+        self.trgShipsData[trg_ship_name]['tcpa'] = 0.0
+        self.trgShipsData[trg_ship_name]['dcpa'] = 0.0
 
         if (x_t_vel != x_o_vel or y_t_vel != y_o_vel):
-            tcpa = -((y_t - y_o) * (y_t_vel - y_o_vel) + (x_t - x_o) * (x_t_vel - x_o_vel)) / (
+            self.trgShipsData[trg_ship_name]['tcpa'] = -((y_t - y_o) * (y_t_vel - y_o_vel) + (x_t - x_o) * (x_t_vel - x_o_vel)) / (
                     math.pow((y_t_vel - y_o_vel), 2) + math.pow((x_t_vel - x_o_vel), 2))
-            dcpa = math.sqrt(math.pow(((y_t - y_o) + (y_t_vel - y_o_vel) * tcpa), 2) + math.pow(
-                ((x_t - x_o) + (x_t_vel - x_o_vel) * tcpa), 2))
+            self.trgShipsData[trg_ship_name]['dcpa'] = math.sqrt(math.pow(((y_t - y_o) + (y_t_vel - y_o_vel) * self.trgShipsData[trg_ship_name]['tcpa']), 2) + math.pow(
+                ((x_t - x_o) + (x_t_vel - x_o_vel) * self.trgShipsData[trg_ship_name]['tcpa']), 2))
 
-            self.trgShipsData[trg_ship_name]["tcpa"] = tcpa
-            self.trgShipsData[trg_ship_name]["dcpa"] = dcpa
-
-
-    def publish_ship_data(self, situation, tcpa, dcpa, collision_point_x, collision_point_y, x_t, y_t, x_o, y_o, theta_trg,
-                          theta_own, sub_num):
+        # print(self.trgShipsData)
+    def publish_ship_data(self, trg_ship_name, situation, tcpa, dcpa, collision_point_x, collision_point_y, x_t, y_t, x_o, y_o, theta_trg,
+                          theta_own):
         msg = ShipData()
         msg.situation = situation
         msg.tcpa = tcpa
@@ -121,7 +125,7 @@ class TcpaDcpa(Node):
         msg.theta_own = theta_own
         msg.header.stamp = self.get_clock().now().to_msg()
 
-        self.publishers_[sub_num].publish(msg)
+        self.publishers_[self.trgShipsData[trg_ship_name]['index']].publish(msg)
         # self.ship_data_publisher_.publish(msg)
 
     def determine_collision_risk(self, trg_ship_name):
@@ -131,20 +135,21 @@ class TcpaDcpa(Node):
         # elif tcpa < 0.0:
         #     logging.warning("Ships are moving away and are out of danger!")
 
-        if self.trgShipsData[trg_ship_name]["tcpa"] > 0.0 and self.trgShipsData[trg_ship_name]["dcpa"] < 1.0:
+        if self.trgShipsData[trg_ship_name]['tcpa'] > 0.0 and self.trgShipsData[trg_ship_name]['dcpa'] < 1.0:
             # logging.warning("High risk of collision!!!")
             return True
         else:
+            self.trgShipsData[trg_ship_name]['scenario'] = "NO COLLISION"
             return False
 
     def calculate_collision_point(self,trg_ship_name, v_0_x, v_0_y, x_o, y_o, tcpa):
-        self.trgShipsData[trg_ship_name]["collision_point_x"] = tcpa * v_0_x + x_o
-        self.trgShipsData[trg_ship_name]["collision_point_y"] = tcpa * v_0_y + y_o
+        self.trgShipsData[trg_ship_name]['collision_point_x'] = tcpa * v_0_x + x_o
+        self.trgShipsData[trg_ship_name]['collision_point_y'] = tcpa * v_0_y + y_o
 
     def determine_avoidance_scenario(self, trg_ship_name):
 
         msg = AvoidanceScenario()
-        course_trg_ship = degrees(self.trgShipsData[trg_ship_name]["trg_theta"]) % 360
+        course_trg_ship = degrees(self.trgShipsData[trg_ship_name]['trg_theta']) % 360
         if course_trg_ship < 0:
             course_trg_ship += 360
         course_own_ship = degrees(self.own_pose_theta) % 360
@@ -154,9 +159,9 @@ class TcpaDcpa(Node):
 
         # Convert ship angles from radians to degrees
         own_ship_speed = abs(self.own_lin_vel)
-        trg_ship_speed = abs(self.trgShipsData[trg_ship_name]["trg_lin_vel"])
+        trg_ship_speed = abs(self.trgShipsData[trg_ship_name]['trg_lin_vel'])
         # Calculate relative position and speed of the two ships
-        rel_pos = (self.own_pose.x - self.trgShipsData[trg_ship_name]["trg_pose_x"], self.own_pose.y - self.trgShipsData[trg_ship_name]["trg_pose_y"])
+        rel_pos = (self.own_pose.x - self.trgShipsData[trg_ship_name]['trg_pose_x'], self.own_pose.y - self.trgShipsData[trg_ship_name]['trg_pose_y'])
         rel_speed = trg_ship_speed - own_ship_speed
 
         # Calculate the angle between the relative position and the true north
@@ -188,7 +193,7 @@ class TcpaDcpa(Node):
             else:
                 print("Parallel courses")
                 scenario = "PARALEL COURSES"
-        self.trgShipsData[trg_ship_name]["scenario"] = scenario
+        self.trgShipsData[trg_ship_name]['scenario'] = scenario
 
         # if angle_between_vessels < 22.5:
         #     return "Head-on situation - both vessels should alter course to starboard"

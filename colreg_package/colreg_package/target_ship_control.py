@@ -8,14 +8,16 @@ class TargetShipController(Node):
 
     def __init__(self):
         super().__init__('target_ship_controller')
-        
-        self.vel_publisher_ = self.create_publisher(Twist, "target_ship/cmd_vel", 10)
-        self.pose_subscriber_ = self.create_subscription(Pose, "target_ship/pose", self.send_vel_command, 10)
 
-    def send_vel_command(self, pose: Pose):
-        cmd = Twist()
-        cmd.linear.x = 0.2
-        self.vel_publisher_.publish(cmd)
+        self.pose_subscriber_ = self.create_subscription(Pose, "/turtle2/pose", self.send_vel_command, 10)
+
+    def send_vel_command(self, data):
+        for i in range(1):
+            vel_pub_topic = "/turtle" + str(i + 2) + "/cmd_vel"
+
+            cmd = Twist()
+            cmd.linear.x = 0.05
+            self.create_publisher(Twist, vel_pub_topic, 10).publish(cmd)
 
 def main(args=None):
     rclpy.init(args=args)
