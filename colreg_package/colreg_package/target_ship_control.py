@@ -16,7 +16,7 @@ class TargetShipController(Node):
             vel_pub_topic = "/turtle" + str(i + 2) + "/cmd_vel"
 
             cmd = Twist()
-            cmd.linear.x = 0.05
+            cmd.linear.x = 0.2
             self.create_publisher(Twist, vel_pub_topic, 10).publish(cmd)
 
 def main(args=None):
