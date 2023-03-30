@@ -154,7 +154,7 @@ class AvoidanceScenario(Node):
         print("angle between vessels: " + str(angle_between_vessels))
 
         if angle_between_vessels <= 185 and angle_between_vessels >= 175:
-            scenario = "Head-on situation"
+            scenario = "HEAD ON"
         elif angle_between_vessels > 10 and angle_between_vessels < 175 or angle_between_vessels > 185 and angle_between_vessels < 360:
             if course_own_ship > course_trg_ship:
                 scenario = "CROSSING PORT TO STARBOARD"
