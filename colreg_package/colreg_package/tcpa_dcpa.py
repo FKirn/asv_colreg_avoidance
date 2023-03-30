@@ -3,9 +3,8 @@ from rclpy.node import Node
 from turtlesim.msg import Pose
 import math
 from colreg_interfaces.msg import ShipData
-from colreg_interfaces.msg import AvoidanceScenario
-import logging
 from math import degrees
+import numpy as np
 
 class TcpaDcpa(Node):
     def __init__(self):
@@ -76,16 +75,15 @@ class TcpaDcpa(Node):
         self.calculate_tcpa_dcpa(trg_ship_name)
 
         if self.determine_collision_risk(trg_ship_name):
-            print("Rizik od sudara")
-            self.calculate_collision_point(trg_ship_name, self.own_vel_x, self.own_vel_y, self.own_pose.x, self.own_pose.y, self.trgShipsData[trg_ship_name]['tcpa'])
+            self.calculate_collision_point(trg_ship_name)
             self.determine_avoidance_scenario(trg_ship_name)
+
         else:
+            self.trgShipsData[trg_ship_name]['scenario'] = "NO COLLISION"
             self.trgShipsData[trg_ship_name]['collision_point_x'] = 0.0
             self.trgShipsData[trg_ship_name]['collision_point_y'] = 0.0
-        self.publish_ship_data(trg_ship_name, self.trgShipsData[trg_ship_name]['scenario'], self.trgShipsData[trg_ship_name]['tcpa'], self.trgShipsData[trg_ship_name]['dcpa'],
-                               self.trgShipsData[trg_ship_name]['collision_point_x'], self.trgShipsData[trg_ship_name]['collision_point_y'],
-                               self.trgShipsData[trg_ship_name]['trg_pose_x'], self.trgShipsData[trg_ship_name]['trg_pose_y'],
-                               self.own_pose_x, self.own_pose_y, self.trgShipsData[trg_ship_name]['trg_theta'], self.own_pose_theta)
+
+        self.publish_ship_data(trg_ship_name)
 
     def calculate_tcpa_dcpa(self, trg_ship_name):
         x_t = self.trgShipsData[trg_ship_name]['trg_pose_x']
@@ -93,8 +91,8 @@ class TcpaDcpa(Node):
         x_t_vel = self.trgShipsData[trg_ship_name]['trg_vel_x']
         y_t_vel = self.trgShipsData[trg_ship_name]['trg_vel_y']
 
-        x_o = self.own_pose.x
-        y_o = self.own_pose.y
+        x_o = self.own_pose_x
+        y_o = self.own_pose_y
         x_o_vel = self.own_vel_x
         y_o_vel = self.own_vel_y
         # dcpa - udaljenost izmedu own broda i tocke u kojoj bi brodovi trebali biti najblizi jedan drugom temeljeno na trenutnim brzinama i smjerovima kretanja
@@ -102,53 +100,142 @@ class TcpaDcpa(Node):
         self.trgShipsData[trg_ship_name]['tcpa'] = 0.0
         self.trgShipsData[trg_ship_name]['dcpa'] = 0.0
 
+        own_vessel_course = self.own_pose_theta
+        other_vessel_course = self.trgShipsData[trg_ship_name]['trg_theta']
+
+
+
+        ###############################################
+
+        # pos_a = np.array([x_o, y_o])
+        # pos_b = np.array([x_t, y_t])
+        # vel_a = np.array([x_o_vel, y_o_vel])
+        # vel_b = np.array([x_t_vel, y_t_vel])
+        #
+        # # Calculate relative position and velocity of vessel B with respect to vessel A
+        # rel_pos = pos_b - pos_a
+        # rel_vel = vel_b - vel_a
+        #
+        # dcpa = np.linalg.norm(rel_pos - np.dot(rel_pos, rel_vel) * rel_vel / np.linalg.norm(rel_vel))
+        # tcpa = -np.dot(rel_pos, rel_vel) / np.linalg.norm(rel_vel) ** 2
+        ################################################
+        # calculate relative positions and velocities
+        # rel_x = x_t - x_o
+        # rel_y = y_t - y_o
+        # rel_speed_x = self.trgShipsData[trg_ship_name]['trg_lin_vel'] * math.sin(other_vessel_course) - self.own_lin_vel * math.sin(
+        #     own_vessel_course)
+        # rel_speed_y = self.trgShipsData[trg_ship_name]['trg_lin_vel'] * math.cos(other_vessel_course) - self.own_lin_vel * math.cos(
+        #     own_vessel_course)
+        #
+        # # calculate the quadratic equation coefficients
+        # a = rel_speed_x ** 2 + rel_speed_y ** 2 - 0.25 * (self.own_lin_vel + self.trgShipsData[trg_ship_name]['trg_lin_vel']) ** 2
+        # b = 2 * (rel_x * rel_speed_x + rel_y * rel_speed_y)
+        # c = rel_x ** 2 + rel_y ** 2
+        #
+        # # calculate the time to CPA (tcpa) and the distance to CPA (dcpa)
+        # if a == 0:
+        #     tcpa = -c / b
+        # else:
+        #     disc = b ** 2 - 4 * a * c
+        #     if disc < 0:
+        #         tcpa = math.inf
+        #     else:
+        #         root = math.sqrt(disc)
+        #         tcpa1 = (-b - root) / (2 * a)
+        #         tcpa2 = (-b + root) / (2 * a)
+        #         if tcpa1 < 0:
+        #             tcpa = tcpa2
+        #         elif tcpa2 < 0:
+        #             tcpa = tcpa1
+        #         else:
+        #             tcpa = min(tcpa1, tcpa2)
+        #
+        # dcpa = math.sqrt((rel_x - 0.5 * self.own_lin_vel * tcpa * rel_speed_x) ** 2 + (
+        #             rel_y - 0.5 * self.own_lin_vel * tcpa * rel_speed_y) ** 2)
+
+
+
+        #########################################################
+
+        # ship1_pos = (x_o,y_o)
+        # ship2_pos = (x_t,y_t)
+        #
+        # ship1_vel = (x_o_vel, y_o_vel)
+        # ship2_vel = (x_t_vel, y_t_vel)
+        # ship1_speed = self.own_lin_vel
+        # ship2_speed = self.trgShipsData[trg_ship_name]['trg_lin_vel']
+        #
+        # # Convert courses to radians
+        # ship1_course_rad = math.radians(ship1_course)
+        # ship2_course_rad = math.radians(ship2_course)
+        #
+        # # Calculate the ships' velocities in the x and y directions
+        # ship1_vel = [ship1_speed * math.cos(ship1_course_rad), ship1_speed * math.sin(ship1_course_rad)]
+        # ship2_vel = [ship2_speed * math.cos(ship2_course_rad), ship2_speed * math.sin(ship2_course_rad)]
+        #
+        # # Calculate the relative velocity of ship 2 with respect to ship 1
+        # ship_rel_vel = [ship2_vel[0] - ship1_vel[0], ship2_vel[1] - ship1_vel[1]]
+        #
+        # # Calculate the distance between the two ships
+        # dist = math.sqrt((ship2_pos[0] - ship1_pos[0]) ** 2 + (ship2_pos[1] - ship1_pos[1]) ** 2)
+        #
+        # # Calculate the time to closest point of approach (TCPA)
+        # tcpa = -((ship2_pos[0] - ship1_pos[0]) * ship_rel_vel[0] + (ship2_pos[1] - ship1_pos[1]) * ship_rel_vel[1]) / (
+        #             dist ** 2 - (ship_rel_vel[0] ** 2 + ship_rel_vel[1] ** 2))
+        #
+        # # Calculate the distance to closest point of approach (DCPA)
+        # dcpa = math.sqrt((ship1_pos[0] + ship_rel_vel[0] * tcpa - ship2_pos[0]) ** 2 + (
+        #             ship1_pos[1] + ship_rel_vel[1] * tcpa - ship2_pos[1]) ** 2)
+
+        #########################################################
+
+
         if (x_t_vel != x_o_vel or y_t_vel != y_o_vel):
-            self.trgShipsData[trg_ship_name]['tcpa'] = -((y_t - y_o) * (y_t_vel - y_o_vel) + (x_t - x_o) * (x_t_vel - x_o_vel)) / (
+            tcpa = -((y_t - y_o) * (y_t_vel - y_o_vel) + (x_t - x_o) * (x_t_vel - x_o_vel)) / (
                     math.pow((y_t_vel - y_o_vel), 2) + math.pow((x_t_vel - x_o_vel), 2))
-            self.trgShipsData[trg_ship_name]['dcpa'] = math.sqrt(math.pow(((y_t - y_o) + (y_t_vel - y_o_vel) * self.trgShipsData[trg_ship_name]['tcpa']), 2) + math.pow(
+            dcpa = math.sqrt(math.pow(((y_t - y_o) + (y_t_vel - y_o_vel) * tcpa), 2) + math.pow(
                 ((x_t - x_o) + (x_t_vel - x_o_vel) * self.trgShipsData[trg_ship_name]['tcpa']), 2))
 
-        # print(self.trgShipsData)
-    def publish_ship_data(self, trg_ship_name, situation, tcpa, dcpa, collision_point_x, collision_point_y, x_t, y_t, x_o, y_o, theta_trg,
-                          theta_own):
+        self.trgShipsData[trg_ship_name]['tcpa'] = tcpa
+        self.trgShipsData[trg_ship_name]['dcpa'] = dcpa
+
+    def publish_ship_data(self, trg_ship_name):
+
         msg = ShipData()
-        msg.situation = situation
-        msg.tcpa = tcpa
-        msg.dcpa = dcpa
-        msg.collision_point_x = collision_point_x
-        msg.collision_point_y = collision_point_y
-        msg.x_target = x_t
-        msg.y_target = y_t
-        msg.x_own = x_o
-        msg.y_own = y_o
-        msg.theta_target = theta_trg
-        msg.theta_own = theta_own
+        msg.situation = self.trgShipsData[trg_ship_name]['scenario']
+        msg.tcpa = self.trgShipsData[trg_ship_name]['tcpa']
+        msg.dcpa = self.trgShipsData[trg_ship_name]['dcpa']
+        msg.collision_point_x = self.trgShipsData[trg_ship_name]['collision_point_x']
+        msg.collision_point_y = self.trgShipsData[trg_ship_name]['collision_point_y']
+        msg.x_target = self.trgShipsData[trg_ship_name]['trg_pose_x']
+        msg.y_target = self.trgShipsData[trg_ship_name]['trg_pose_y']
+        msg.x_own = self.own_pose_x
+        msg.y_own = self.own_pose_y
+        msg.theta_target = self.trgShipsData[trg_ship_name]['trg_theta']
+        msg.theta_own = self.own_pose_theta
         msg.header.stamp = self.get_clock().now().to_msg()
 
         self.publishers_[self.trgShipsData[trg_ship_name]['index']].publish(msg)
-        # self.ship_data_publisher_.publish(msg)
 
     def determine_collision_risk(self, trg_ship_name):
 
-        # if tcpa > 0.0:
-        #     logging.warning("Ships are approaching!")
-        # elif tcpa < 0.0:
-        #     logging.warning("Ships are moving away and are out of danger!")
-
-        if self.trgShipsData[trg_ship_name]['tcpa'] > 0.0 and self.trgShipsData[trg_ship_name]['dcpa'] < 1.0:
-            # logging.warning("High risk of collision!!!")
+        if self.trgShipsData[trg_ship_name]['tcpa'] > 0.0 and self.trgShipsData[trg_ship_name]['dcpa'] <= 2.0:
+            print("Danger. Extreme risk of collision!")
             return True
+        elif self.trgShipsData[trg_ship_name]['tcpa'] > 5.0 and self.trgShipsData[trg_ship_name]['dcpa'] < 5.0:
+            print("Danger. Ships on a possible collision course!")
+            return False
         else:
             self.trgShipsData[trg_ship_name]['scenario'] = "NO COLLISION"
+            print("Not on a collision course.")
             return False
 
-    def calculate_collision_point(self,trg_ship_name, v_0_x, v_0_y, x_o, y_o, tcpa):
-        self.trgShipsData[trg_ship_name]['collision_point_x'] = tcpa * v_0_x + x_o
-        self.trgShipsData[trg_ship_name]['collision_point_y'] = tcpa * v_0_y + y_o
+    def calculate_collision_point(self, trg_ship_name):
+        self.trgShipsData[trg_ship_name]['collision_point_x'] = self.trgShipsData[trg_ship_name]['tcpa'] * self.own_pose_x
+        self.trgShipsData[trg_ship_name]['collision_point_y'] = self.trgShipsData[trg_ship_name]['tcpa'] * self.own_pose_y
 
     def determine_avoidance_scenario(self, trg_ship_name):
 
-        msg = AvoidanceScenario()
         course_trg_ship = degrees(self.trgShipsData[trg_ship_name]['trg_theta']) % 360
         if course_trg_ship < 0:
             course_trg_ship += 360
@@ -156,95 +243,38 @@ class TcpaDcpa(Node):
         if course_own_ship < 0:
             course_own_ship += 360
 
-
         # Convert ship angles from radians to degrees
         own_ship_speed = abs(self.own_lin_vel)
         trg_ship_speed = abs(self.trgShipsData[trg_ship_name]['trg_lin_vel'])
         # Calculate relative position and speed of the two ships
         rel_pos = (self.own_pose.x - self.trgShipsData[trg_ship_name]['trg_pose_x'], self.own_pose.y - self.trgShipsData[trg_ship_name]['trg_pose_y'])
-        rel_speed = trg_ship_speed - own_ship_speed
 
-        # Calculate the angle between the relative position and the true north
-        rel_angle = math.atan2(rel_pos[1], rel_pos[0])
-        rel_angle = math.degrees(rel_angle)
+        print("trg: " + str(course_trg_ship))
+        print("own: " + str(course_own_ship))
 
-        # Calculate the angle between the true north and the course of each ship
-        ship1_angle = (course_own_ship - rel_angle) % 360
-        ship2_angle = (course_trg_ship - rel_angle) % 360
+        angle_between_vessels = abs(course_trg_ship - course_own_ship)
+        print("trg: " + str(course_trg_ship))
+        print("own: " + str(course_own_ship))
+        print("angle: " + str(angle_between_vessels))
 
-        scenario = "NO COLLISION"
-        # Determine the collision situation based on the angles and the TCPA and DCPA
-        if ship1_angle < 90 or ship1_angle >= 270:
-            print("Head-on")
-            scenario = "HEAD_ON"
-        elif ship1_angle < ship2_angle:
-            print("Crossing, port to port")
-            scenario = "CROSSING_PORT"
-        elif ship1_angle > ship2_angle:
-            print("Crossing, starboard to starboard")
-            scenario = "CROSSING_STARBOARD"
-        elif ship1_angle == ship2_angle:
-            if own_ship_speed < trg_ship_speed:
-                print("Overtaking")
-                scenario = "OVERTAKING"
-            elif own_ship_speed > trg_ship_speed:
-                print("Being overtaken")
-                scenario = "BEING OVERTAKEN"
+        if angle_between_vessels <= 185 and angle_between_vessels >= 175:
+            scenario = "Head-on situation"
+        elif angle_between_vessels > 10 and angle_between_vessels < 175:
+            if course_own_ship > course_trg_ship:
+                scenario = "CROSSING PORT TO STARBOARD"
             else:
-                print("Parallel courses")
-                scenario = "PARALEL COURSES"
+                scenario = "CROSSING STARBOARD TO PORT"
+        elif angle_between_vessels >= 0 and angle_between_vessels <= 10:
+            if own_ship_speed > trg_ship_speed:
+                scenario = "OVERTAKING"
+            elif own_ship_speed < trg_ship_speed:
+                scenario = "BEING OVERTAKEN"
+        else:
+            scenario = "NO COLLISION"
+
         self.trgShipsData[trg_ship_name]['scenario'] = scenario
 
-        # if angle_between_vessels < 22.5:
-        #     return "Head-on situation - both vessels should alter course to starboard"
-        # elif angle_between_vessels < 67.5:
-        #     return "Crossing situation - give-way vessel should alter course to starboard"
-        # elif angle_between_vessels < 112.5:
-        #     return "Crossing situation - both vessels should maintain course and speed"
-        # elif angle_between_vessels < 157.5:
-        #     return "Crossing situation - give-way vessel should alter course to port"
-        # else:
-        #     return "Head-on situation - both vessels should alter course to port"
-
-
-        # msg = AvoidanceScenario()
-        # ships_dist_x_axis = self.trg_pose.x - self.own_pose.x
-        # ships_dist_y_axis = self.trg_pose.y - self.own_pose.y
-        # angle_between_ships = math.atan(ships_dist_y_axis / ships_dist_x_axis)
-        # angle_between_ships_abs = self.own_pose.theta - self.trg_pose.theta
-        #
-        # if angle_between_ships < 0:
-        #     angle_between_ships = angle_between_ships + math.pi
-        #
-        # if self.own_pose.theta < 0:
-        #     own_ship_angle_degrees = (self.own_pose.theta * 57.295779513) + 360
-        #
-        # if self.trg_pose.theta < 0:
-        #     trg_ship_angle_degrees = (self.trg_pose.theta * 57.295779513) + 360
-        #
-        #
-        #
-        # if ((own_ship_angle_degrees <= 95 and own_ship_angle_degrees >= 85 and trg_ship_angle_degrees <= 275 and trg_ship_angle_degrees >= 265)
-        #     or (own_ship_angle_degrees <= 275 and own_ship_angle_degrees >= 265 and trg_ship_angle_degrees <= 95 and trg_ship_angle_degrees >= 85)):
-        #     msg.scenario = msg.HEAD_ON
-        #elif():
-
-
-        # if (angle_between_ships > 1.745329 and angle_between_ships < 3.490659):
-        #     msg.scenario = msg.CROSSING_PORT
-        #
-        # elif (
-        #         angle_between_ships >= 5.934119 and angle_between_ships <= 6.283185 or angle_between_ships >= 0.0 and angle_between_ships < 1.396263):
-        #     msg.scenario = msg.CROSSING_STARBOARD
-        #
-        # elif (angle_between_ships >= 1.396263 and angle_between_ships <= 1.745329):
-        #     if (angle_between_ships_abs < 0.349065 and angle_between_ships_abs > -0.349065):
-        #         msg.scenario = msg.OVERTAKING
-        #     elif (angle_between_ships_abs < 3.490658 and angle_between_ships_abs > 2.792526):
-        #         msg.scenario = msg.HEAD_ON
-        # else:
-        #     msg.scenario = msg.NO_COLLISION
-
+        print(scenario)
 
     def calculate_velocity_x(self, velocity, theta):
         return velocity * math.cos(theta)
