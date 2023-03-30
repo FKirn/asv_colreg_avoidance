@@ -25,9 +25,8 @@ setup(
         'console_scripts': [
         'position = colreg_package.turtle_positioning:main',
         'target_ship_control = colreg_package.target_ship_control:main',
-        'main_ship_control = colreg_package.main_ship_control:main',
-        'tcpa_dcpa = colreg_package.tcpa_dcpa:main',
-        'avoidance_scenario = colreg_package.avoidance_scenario:main'
+        'own_ship_control = colreg_package.own_ship_control:main',
+        'collision_scenario_calculation = colreg_package.collision_scenario_calculation:main'
         ],
     },
 )

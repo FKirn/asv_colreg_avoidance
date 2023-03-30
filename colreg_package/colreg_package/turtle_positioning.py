@@ -31,7 +31,7 @@ class TurtlePositioning(Node):
         # y_spawn = self.get_parameter('y_spawn')
         # theta_spawn = self.get_parameter('theta_spawn')
         # self.call_service_teleport(x_tel.value, y_tel.value, theta_tel.value)
-        self.call_service_teleport(5.0, 2.0, 1.57)      #OWN SHIP
+        self.call_service_teleport(5.0, 5.0, 0.0)      #OWN SHIP
         time.sleep(1)
         positions = self.generate_circle_points()
         # for i in range(len(positions)):
@@ -40,7 +40,7 @@ class TurtlePositioning(Node):
         #     # self.call_service_spawn(x_spawn.value, y_spawn.value, theta_spawn.value)
         #     self.call_service_spawn(positions[i][0], positions[i][1], positions[i][2])
         #     time.sleep(0.05)
-        self.call_service_spawn(5.0, 5.0, 1.57)        #TRG SHIP
+        self.call_service_spawn(2.0, 5.0, 0.0)        #TRG SHIP
         self.call_service_clear()
 
     def call_service_teleport(self, x, y, theta):

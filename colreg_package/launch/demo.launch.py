@@ -19,7 +19,7 @@ def generate_launch_description():
             ('/turtle1/cmd_vel', 'own_ship/cmd_vel'),
         ],
     )
-    turtle_control_node = Node(
+    initial_positioning_node = Node(
         package="colreg_package",
         executable="position",
         name="turtle_initial_positioning",
@@ -34,30 +34,22 @@ def generate_launch_description():
         name="target_ship_control"
     )
 
-    main_ship_control_node = Node(
+    own_ship_control_node = Node(
         package="colreg_package",
-        executable="main_ship_control",
-        name="main_ship_control"
+        executable="own_ship_control",
+        name="own_ship_control"
     )
 
-    tcpa_dcpa_node = Node(
+    collision_scenario_calculation_node = Node(
         package="colreg_package",
-        executable="tcpa_dcpa",
-        name="tcpa_dcpa_calculation",
+        executable="collision_scenario_calculation",
+        name="collision_scenario_calculation",
         output="screen"
     )
 
-    # avoidance_scenario_node = Node(
-    #     package="colreg_package",
-    #     executable="avoidance_scenario",
-    #     name = "determine_avoidance_scenario",
-    #     output="screen"
-    # )
-
     ld.add_action(turtlesim_node)
-    ld.add_action(turtle_control_node)
+    ld.add_action(initial_positioning_node)
     ld.add_action(target_ship_control_node)
-    ld.add_action(main_ship_control_node)
-    ld.add_action(tcpa_dcpa_node)
-    # ld.add_action(avoidance_scenario_node)
+    ld.add_action(own_ship_control_node)
+    ld.add_action(collision_scenario_calculation_node)
     return ld

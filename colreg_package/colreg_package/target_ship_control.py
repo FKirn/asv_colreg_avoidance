@@ -4,7 +4,7 @@ from turtlesim.msg import Pose
 from geometry_msgs.msg import Twist
 
 
-class TargetShipController(Node):
+class TargetShipControl(Node):
 
     def __init__(self):
         super().__init__('target_ship_controller')
@@ -16,12 +16,12 @@ class TargetShipController(Node):
             vel_pub_topic = "/turtle" + str(i + 2) + "/cmd_vel"
 
             cmd = Twist()
-            cmd.linear.x = 0.2
+            cmd.linear.x = 0.3
             self.create_publisher(Twist, vel_pub_topic, 10).publish(cmd)
 
 def main(args=None):
     rclpy.init(args=args)
-    node = TargetShipController()
+    node = TargetShipControl()
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
