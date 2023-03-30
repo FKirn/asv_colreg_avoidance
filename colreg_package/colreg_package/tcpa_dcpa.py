@@ -103,8 +103,6 @@ class TcpaDcpa(Node):
         own_vessel_course = self.own_pose_theta
         other_vessel_course = self.trgShipsData[trg_ship_name]['trg_theta']
 
-
-
         ###############################################
 
         # pos_a = np.array([x_o, y_o])
