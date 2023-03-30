@@ -88,13 +88,9 @@ class TcpaDcpa(Node):
     def calculate_tcpa_dcpa(self, trg_ship_name):
         x_t = self.trgShipsData[trg_ship_name]['trg_pose_x']
         y_t = self.trgShipsData[trg_ship_name]['trg_pose_y']
-        x_t_vel = self.trgShipsData[trg_ship_name]['trg_vel_x']
-        y_t_vel = self.trgShipsData[trg_ship_name]['trg_vel_y']
-
         x_o = self.own_pose_x
         y_o = self.own_pose_y
-        x_o_vel = self.own_vel_x
-        y_o_vel = self.own_vel_y
+
         # dcpa - udaljenost izmedu own broda i tocke u kojoj bi brodovi trebali biti najblizi jedan drugom temeljeno na trenutnim brzinama i smjerovima kretanja
         # tcpa - vrijeme potrebno da se dode do tocke u kojoj bi brodovi trebali biti najblizi jedan drugom temeljeno na trenutnim brzinama i smjerovima kretanja
         self.trgShipsData[trg_ship_name]['tcpa'] = 0.0
@@ -103,54 +99,10 @@ class TcpaDcpa(Node):
         own_vessel_course = self.own_pose_theta
         other_vessel_course = self.trgShipsData[trg_ship_name]['trg_theta']
 
-        ###############################################
-
-        # pos_a = np.array([x_o, y_o])
-        # pos_b = np.array([x_t, y_t])
-        # vel_a = np.array([x_o_vel, y_o_vel])
-        # vel_b = np.array([x_t_vel, y_t_vel])
-        #
-        # # Calculate relative position and velocity of vessel B with respect to vessel A
-        # rel_pos = pos_b - pos_a
-        # rel_vel = vel_b - vel_a
-        #
-        # dcpa = np.linalg.norm(rel_pos - np.dot(rel_pos, rel_vel) * rel_vel / np.linalg.norm(rel_vel))
-        # tcpa = -np.dot(rel_pos, rel_vel) / np.linalg.norm(rel_vel) ** 2
-        ################################################
-        # calculate relative positions and velocities
-        # rel_x = x_t - x_o
-        # rel_y = y_t - y_o
-        # rel_speed_x = self.trgShipsData[trg_ship_name]['trg_lin_vel'] * math.sin(other_vessel_course) - self.own_lin_vel * math.sin(
-        #     own_vessel_course)
-        # rel_speed_y = self.trgShipsData[trg_ship_name]['trg_lin_vel'] * math.cos(other_vessel_course) - self.own_lin_vel * math.cos(
-        #     own_vessel_course)
-        #
-        # # calculate the quadratic equation coefficients
-        # a = rel_speed_x ** 2 + rel_speed_y ** 2 - 0.25 * (self.own_lin_vel + self.trgShipsData[trg_ship_name]['trg_lin_vel']) ** 2
-        # b = 2 * (rel_x * rel_speed_x + rel_y * rel_speed_y)
-        # c = rel_x ** 2 + rel_y ** 2
-        #
-        # # calculate the time to CPA (tcpa) and the distance to CPA (dcpa)
-        # if a == 0:
-        #     tcpa = -c / b
-        # else:
-        #     disc = b ** 2 - 4 * a * c
-        #     if disc < 0:
-        #         tcpa = math.inf
-        #     else:
-        #         root = math.sqrt(disc)
-        #         tcpa1 = (-b - root) / (2 * a)
-        #         tcpa2 = (-b + root) / (2 * a)
-        #         if tcpa1 < 0:
-        #             tcpa = tcpa2
-        #         elif tcpa2 < 0:
-        #             tcpa = tcpa1
-        #         else:
-        #             tcpa = min(tcpa1, tcpa2)
-        #
-        # dcpa = math.sqrt((rel_x - 0.5 * self.own_lin_vel * tcpa * rel_speed_x) ** 2 + (
-        #             rel_y - 0.5 * self.own_lin_vel * tcpa * rel_speed_y) ** 2)
-
+        x_o_vel = self.own_lin_vel * math.cos(own_vessel_course)
+        y_o_vel = self.own_lin_vel * math.sin(own_vessel_course)
+        x_t_vel = self.trgShipsData[trg_ship_name]['trg_lin_vel'] * math.cos(other_vessel_course)
+        y_t_vel = self.trgShipsData[trg_ship_name]['trg_lin_vel'] * math.sin(other_vessel_course)
 
 
         #########################################################
@@ -186,13 +138,20 @@ class TcpaDcpa(Node):
         #             ship1_pos[1] + ship_rel_vel[1] * tcpa - ship2_pos[1]) ** 2)
 
         #########################################################
-
+        print("x_t:" + str(x_t))
+        print("y_t:" + str(y_t))
+        print("x_o:" + str(x_o))
+        print("y_o:" + str(y_o))
+        print("x_t_vel:" + str(x_t_vel))
+        print("y_t_vel:" + str(y_t_vel))
+        print("x_o_vel:" + str(x_o_vel))
+        print("y_o_vel:" + str(y_o_vel))
 
         if (x_t_vel != x_o_vel or y_t_vel != y_o_vel):
             tcpa = -((y_t - y_o) * (y_t_vel - y_o_vel) + (x_t - x_o) * (x_t_vel - x_o_vel)) / (
                     math.pow((y_t_vel - y_o_vel), 2) + math.pow((x_t_vel - x_o_vel), 2))
             dcpa = math.sqrt(math.pow(((y_t - y_o) + (y_t_vel - y_o_vel) * tcpa), 2) + math.pow(
-                ((x_t - x_o) + (x_t_vel - x_o_vel) * self.trgShipsData[trg_ship_name]['tcpa']), 2))
+                ((x_t - x_o) + (x_t_vel - x_o_vel) * tcpa), 2))
 
         self.trgShipsData[trg_ship_name]['tcpa'] = tcpa
         self.trgShipsData[trg_ship_name]['dcpa'] = dcpa
