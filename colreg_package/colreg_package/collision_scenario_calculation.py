@@ -123,7 +123,7 @@ class AvoidanceScenario(Node):
 
     def determine_collision_risk(self, trg_ship_name):
 
-        if self.trgShipsData[trg_ship_name]['tcpa'] > 0.0 and self.trgShipsData[trg_ship_name]['dcpa'] <= 2.0:
+        if self.trgShipsData[trg_ship_name]['tcpa'] > 0.0 and self.trgShipsData[trg_ship_name]['dcpa'] <= 1.2:
             print("Danger! Extreme risk of collision!")
             return True
         elif self.trgShipsData[trg_ship_name]['tcpa'] > 0.0 and self.trgShipsData[trg_ship_name]['dcpa'] < 4.0:
@@ -151,15 +151,26 @@ class AvoidanceScenario(Node):
         trg_ship_speed = abs(self.trgShipsData[trg_ship_name]['trg_lin_vel'])
 
         angle_between_vessels = abs(course_trg_ship - course_own_ship)
-        print("angle between vessels: " + str(angle_between_vessels))
+        # print(angle_between_vessels)
+        # print("trg_ " + str(course_trg_ship))
+        # print("own_ " + str(course_own_ship))
 
+        relative_course = (course_trg_ship - course_own_ship) % 360
+        # print("relative_ " + str(relative_course))
         if angle_between_vessels <= 185 and angle_between_vessels >= 175:
             scenario = "HEAD ON"
         elif angle_between_vessels > 10 and angle_between_vessels < 175 or angle_between_vessels > 185 and angle_between_vessels < 360:
-            if course_own_ship > course_trg_ship:
-                scenario = "CROSSING PORT TO STARBOARD"
-            else:
-                scenario = "CROSSING STARBOARD TO PORT"
+
+            if course_trg_ship > course_own_ship:
+                if relative_course > 10 and relative_course  < 175:
+                    scenario = "CROSSING STARBOARD TO PORT"
+                elif relative_course > 185 and relative_course  < 360:
+                    scenario = "CROSSING PORT TO STARBOARD"
+            elif course_own_ship > course_trg_ship:
+                if relative_course > 10 and relative_course  < 175:
+                    scenario = "CROSSING STARBOARD TO PORT"
+                elif relative_course > 185 and relative_course  < 360:
+                    scenario = "CROSSING PORT TO STARBOARD"
         elif angle_between_vessels >= 0 and angle_between_vessels <= 10:
             if own_ship_speed > trg_ship_speed:
                 scenario = "OVERTAKING"
