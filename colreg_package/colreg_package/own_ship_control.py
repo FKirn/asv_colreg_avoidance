@@ -14,7 +14,7 @@ class OwnShipControl(Node):
 
     def send_vel_command(self, pose: Pose):
         cmd = Twist()
-        cmd.linear.x = 0.2
+        cmd.linear.x = 0.09
         self.vel_publisher_.publish(cmd)
 
 def main(args=None):
