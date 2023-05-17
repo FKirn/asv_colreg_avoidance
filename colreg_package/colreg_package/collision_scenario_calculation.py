@@ -1,15 +1,15 @@
 import rclpy
 from rclpy.node import Node
-from turtlesim.msg import Pose
 import math
+from geometry_msgs.msg import PoseWithCovarianceStamped
 from colreg_interfaces.msg import ShipData
 from math import degrees
+
 
 class AvoidanceScenario(Node):
     def __init__(self):
         super().__init__('tcpa_dcpa_calculation')
 
-        self.own_pose = Pose()
         self.own_lin_vel = 0.0
         self.own_vel_x = 0.0
         self.own_vel_y = 0.0
@@ -20,18 +20,42 @@ class AvoidanceScenario(Node):
         self.subscribers = []
         self.publishers_ = []
 
-        self.own_ship_pose_subscriber_ = self.create_subscription(Pose, "/own_ship/pose", self.own_pose_callback, 10)
+        self.previous_own_x_pos = None
+        self.previous_own_y_pos = None
+        self.previous_own_time = None
+
+        own_ship_pos_topic = "/marus_boat/pos"
+        self.own_ship_pos_subscriber_ = self.create_subscription(PoseWithCovarianceStamped, own_ship_pos_topic, self.own_pos_callback, 10)
+
         for i in range(1):
-            sub_topic = "/turtle" + str(i + 2) + "/pose"
+            sub_topic = "/marus_boat" + str(i + 2) + "/pos"
             pub_topic = "ship_data/ship_" + str(i + 1)
             self.publishers_.append(self.create_publisher(ShipData, pub_topic, 10))
-            self.subscribers.append(self.create_subscription(Pose, sub_topic, self.create_trg_pose_callback(i), 10))
+            self.subscribers.append(self.create_subscription(PoseWithCovarianceStamped, sub_topic, self.create_trg_pose_callback(i), 10))
 
-    def own_pose_callback(self, data):
-        self.own_pose_x = data.x
-        self.own_pose_y = data.y
-        self.own_pose_theta = data.theta
-        self.own_lin_vel = data.linear_velocity
+    def own_pos_callback(self, data):
+        self.own_pose_x = data.position.x
+        self.own_pose_y = data.position.y
+
+        current_time = data.header.stamp.sec + data.header.stamp.nanosec * 1e-9
+        linear_velocity_x = 0.0
+        linear_velocity_y = 0.0
+
+        if self.previous_own_x_pos is not None and self.previous_own_y_pos is not None and self.previous_own_time is not None:
+            time_delta = (current_time - self.previous_own_time).nanoseconds / 1e9
+
+            delta_x = data.position.x - self.previous_own_x_pos
+            delta_y = data.position.y - self.previous_own_y_pos
+
+            linear_velocity_x = delta_x / time_delta
+            linear_velocity_y = delta_y / time_delta
+
+        self.own_vel_x = linear_velocity_x
+        self.own_vel_y = linear_velocity_y
+        self.own_lin_vel = math.sqrt(linear_velocity_x ** 2 + linear_velocity_y ** 2)
+        self.previous_own_x_pos = data.position.x
+        self.previous_own_y_pos = data.position.y
+        self.previous_own_time = current_time
 
     def create_trg_pose_callback(self, idx):
         return lambda m: self.trg_pose_callback(m, idx)
@@ -48,19 +72,36 @@ class AvoidanceScenario(Node):
         self.calculate_publish(trg_ship_name)
 
     def createShipDataDict(self, data, index):
-        trg_pose_x = data.x
-        trg_pose_y = data.y
-        trg_theta = data.theta
-        trg_lin_vel = data.linear_velocity
+        trg_pose_x = data.position.x
+        trg_pose_y = data.position.y
+        trg_theta = 0.0
 
-        return {'index': index,'trg_pose_x': trg_pose_x, 'trg_pose_y': trg_pose_y, 'trg_theta': trg_theta,
-                'trg_lin_vel': trg_lin_vel}
+        return {'index': index, 'trg_pose_x': trg_pose_x, 'trg_pose_y': trg_pose_y, 'trg_theta': trg_theta,
+                'trg_vel_x': None, 'trg_vel_y': None, 'previous_trg_x_pos': None, 'previous_trg_y_pos': None,
+                'previous_trg_time': None, 'trg_lin_vel': None}
 
     def updateShipDataDict(self, trg_ship_name, data):
-        self.trgShipsData[trg_ship_name]['trg_pose_x'] = data.x
-        self.trgShipsData[trg_ship_name]['trg_pose_y'] = data.y
-        self.trgShipsData[trg_ship_name]['trg_theta'] = data.theta
-        self.trgShipsData[trg_ship_name]['trg_lin_vel'] = data.linear_velocity
+        self.trgShipsData[trg_ship_name]['trg_pose_x'] = data.position.x
+        self.trgShipsData[trg_ship_name]['trg_pose_y'] = data.position.y
+
+        current_time = data.header.stamp.sec + data.header.stamp.nanosec * 1e-9
+        linear_velocity_x = 0.0
+        linear_velocity_y = 0.0
+
+        if self.trgShipsData[trg_ship_name]['previous_trg_x_pos'] is not None and self.trgShipsData[trg_ship_name]['previous_trg_y_pos'] is not None and self.trgShipsData[trg_ship_name]['previous_trg_time'] is not None:
+
+            time_delta = (current_time - self.trgShipsData[trg_ship_name]['previous_trg_time']).nanoseconds / 1e9
+            delta_x = data.position.x - self.self.trgShipsData[trg_ship_name]['previous_trg_x_pos']
+            delta_y = data.position.y - self.self.trgShipsData[trg_ship_name]['previous_trg_y_pos']
+            linear_velocity_x = delta_x / time_delta
+            linear_velocity_y = delta_y / time_delta
+
+        self.trgShipsData[trg_ship_name]['trg_vel_x'] = linear_velocity_x
+        self.trgShipsData[trg_ship_name]['trg_vel_y'] = linear_velocity_y
+        self.trgShipsData[trg_ship_name]['trg_lin_vel'] = math.sqrt(linear_velocity_x ** 2 + linear_velocity_y ** 2)
+        self.trgShipsData[trg_ship_name]['previous_trg_x_pos'] = data.position.x
+        self.trgShipsData[trg_ship_name]['previous_trg_y_pos'] = data.position.y
+        self.trgShipsData[trg_ship_name]['previous_trg_time'] = current_time
 
     def calculate_publish(self, trg_ship_name):
 
@@ -88,11 +129,10 @@ class AvoidanceScenario(Node):
         tcpa = float('inf')
         dcpa = float('inf')
 
-        x_o_vel = self.own_lin_vel * math.cos(self.own_pose_theta)
-        y_o_vel = self.own_lin_vel * math.sin(self.own_pose_theta)
-        x_t_vel = self.trgShipsData[trg_ship_name]['trg_lin_vel'] * math.cos(self.trgShipsData[trg_ship_name]['trg_theta'])
-        y_t_vel = self.trgShipsData[trg_ship_name]['trg_lin_vel'] * math.sin(self.trgShipsData[trg_ship_name]['trg_theta'])
-
+        x_o_vel = self.own_vel_x
+        y_o_vel = self.own_vel_y
+        x_t_vel = self.trgShipsData[trg_ship_name]['trg_vel_x']
+        y_t_vel = self.trgShipsData[trg_ship_name]['trg_vel_y']
 
         if (x_t_vel != x_o_vel or y_t_vel != y_o_vel):
             tcpa = -((y_t - y_o) * (y_t_vel - y_o_vel) + (x_t - x_o) * (x_t_vel - x_o_vel)) / (
@@ -135,8 +175,10 @@ class AvoidanceScenario(Node):
             return False
 
     def calculate_collision_point(self, trg_ship_name):
-        self.trgShipsData[trg_ship_name]['collision_point_x'] = self.trgShipsData[trg_ship_name]['tcpa'] * self.own_pose_x
-        self.trgShipsData[trg_ship_name]['collision_point_y'] = self.trgShipsData[trg_ship_name]['tcpa'] * self.own_pose_y
+        self.trgShipsData[trg_ship_name]['collision_point_x'] = self.trgShipsData[trg_ship_name][
+                                                                    'tcpa'] * self.own_pose_x
+        self.trgShipsData[trg_ship_name]['collision_point_y'] = self.trgShipsData[trg_ship_name][
+                                                                    'tcpa'] * self.own_pose_y
 
     def determine_avoidance_scenario(self, trg_ship_name):
 
@@ -149,29 +191,24 @@ class AvoidanceScenario(Node):
 
         own_ship_speed = abs(self.own_lin_vel)
         trg_ship_speed = abs(self.trgShipsData[trg_ship_name]['trg_lin_vel'])
-
         angle_between_vessels = abs(course_trg_ship - course_own_ship)
-        # print(angle_between_vessels)
-        # print("trg_ " + str(course_trg_ship))
-        # print("own_ " + str(course_own_ship))
-
         relative_course = (course_trg_ship - course_own_ship) % 360
-        # print("relative_ " + str(relative_course))
-        if angle_between_vessels <= 185 and angle_between_vessels >= 175:
+
+        if 185 >= angle_between_vessels >= 175:
             scenario = "HEAD ON"
-        elif angle_between_vessels > 10 and angle_between_vessels < 175 or angle_between_vessels > 185 and angle_between_vessels < 360:
+        elif 10 < angle_between_vessels < 175 or 185 < angle_between_vessels < 360:
 
             if course_trg_ship > course_own_ship:
-                if relative_course > 10 and relative_course  < 175:
+                if 10 < relative_course < 175:
                     scenario = "CROSSING STARBOARD TO PORT"
-                elif relative_course > 185 and relative_course  < 360:
+                elif 185 < relative_course < 360:
                     scenario = "CROSSING PORT TO STARBOARD"
             elif course_own_ship > course_trg_ship:
-                if relative_course > 10 and relative_course  < 175:
+                if 10 < relative_course < 175:
                     scenario = "CROSSING STARBOARD TO PORT"
-                elif relative_course > 185 and relative_course  < 360:
+                elif 185 < relative_course < 360:
                     scenario = "CROSSING PORT TO STARBOARD"
-        elif angle_between_vessels >= 0 and angle_between_vessels <= 10:
+        elif 0 <= angle_between_vessels <= 10:
             if own_ship_speed > trg_ship_speed:
                 scenario = "OVERTAKING"
             elif own_ship_speed < trg_ship_speed:
@@ -182,6 +219,7 @@ class AvoidanceScenario(Node):
         self.trgShipsData[trg_ship_name]['scenario'] = scenario
 
         print(scenario)
+
 
 def main(args=None):
     rclpy.init(args=args)

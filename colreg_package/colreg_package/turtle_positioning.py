@@ -40,7 +40,7 @@ class TurtlePositioning(Node):
         #     # self.call_service_spawn(x_spawn.value, y_spawn.value, theta_spawn.value)
         #     self.call_service_spawn(positions[i][0], positions[i][1], positions[i][2])
         #     time.sleep(0.05)
-        self.call_service_spawn(5.9, 0.5, 1.66)        #TRG SHIP
+        self.call_service_spawn(9.0, 2.5, 2.20)        #TRG SHIP
         self.call_service_clear()
 
     def call_service_teleport(self, x, y, theta):
