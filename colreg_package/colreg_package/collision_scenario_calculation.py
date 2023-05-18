@@ -10,8 +10,10 @@ import tf
 def calculate_theta_from_quaternion(quaternion):
 
     (_, _, yaw) = tf.transformations.euler_from_quaternion(quaternion, 'rzyx')
-    theta = math.atan2(math.sin(-yaw), math.cos(-yaw))  # in range [0, 2*pi]
+    theta = (-yaw) % (2 * math.pi)
 
+    if theta < 0:
+        theta += 360
     return theta
 
 
