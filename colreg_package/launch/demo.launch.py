@@ -47,9 +47,9 @@ def generate_launch_description():
         output="screen"
     )
 
-    ld.add_action(turtlesim_node)
-    ld.add_action(initial_positioning_node)
-    ld.add_action(target_ship_control_node)
-    ld.add_action(own_ship_control_node)
+    # ld.add_action(turtlesim_node)
+    # ld.add_action(initial_positioning_node)
+    # ld.add_action(target_ship_control_node)
+    # ld.add_action(own_ship_control_node)
     ld.add_action(collision_scenario_calculation_node)
     return ld
