@@ -2,18 +2,34 @@ import rclpy
 from rclpy.node import Node
 import math
 from geometry_msgs.msg import PoseWithCovarianceStamped
+from sensor_msgs.msg import Imu
 from colreg_interfaces.msg import ShipData
 from math import degrees
-import tf
+import numpy as np
 
 
 def calculate_theta_from_quaternion(quaternion):
 
-    (_, _, yaw) = tf.transformations.euler_from_quaternion(quaternion, 'rzyx')
-    theta = (-yaw) % (2 * math.pi)
+    siny_cosp = +2.0 * (quaternion[0] * quaternion[1] + quaternion[2] * quaternion[3])
+    cosy_cosp = +1.0 - 2.0 * (quaternion[1] * quaternion[1] + quaternion[2] * quaternion[2])
+    theta = math.atan2(siny_cosp, cosy_cosp)
 
-    if theta < 0:
-        theta += 360
+    theta = (-np.degrees(theta))
+
+
+    #transfer to turtlesim angles
+    if theta == 0:
+        theta = theta + 90
+    elif theta == -180 or theta == 180:
+        theta = 270
+    elif theta == 90:
+        theta = 0
+    elif (0>theta> -180):
+        theta = -theta + 90
+    elif (90<theta< 180):
+        theta = 450 - theta
+    elif (0<theta<90):
+        theta = 90 - theta
     return theta
 
 
@@ -28,7 +44,8 @@ class AvoidanceScenario(Node):
         self.own_pose_y = 0.0
         self.own_theta = 0.0
         self.trgShipsData = {}
-        self.subscribers = []
+        self.subscribers_pos = []
+        self.subscribers_imu = []
         self.publishers_ = []
 
         self.previous_own_x_pos = None
@@ -36,24 +53,28 @@ class AvoidanceScenario(Node):
         self.previous_own_time = None
 
         own_ship_pos_topic = "/marus_boat/pos"
+        own_ship_imu_topic = "/marus_boat/imu"
         self.own_ship_pos_subscriber_ = self.create_subscription(PoseWithCovarianceStamped, own_ship_pos_topic, self.own_pos_callback, 10)
+        self.own_ship_imu_subscriber_ = self.create_subscription(Imu, own_ship_imu_topic,self.own_imu_callback, 10)
 
         for i in range(1):
             # sub_topic = "/marus_boat" + str(i + 0) + "/pos"
-            sub_topic = "/marus_boat0/pos"
-            pub_topic = "ship_data/ship_" + str(i + 1)
-            self.publishers_.append(self.create_publisher(ShipData, pub_topic, 10))
-            self.subscribers.append(self.create_subscription(PoseWithCovarianceStamped, sub_topic, self.create_trg_pose_callback(i), 10))
+            sub_pos_topic = "/marus_boat1/pos"
+            sub_imu_topic = "/marus_boat1/imu"
+            # pub_topic = "ship_data/ship_" + str(i + 1)
+            pub_pos_topic = "ship_data/ship_1"
+            self.publishers_.append(self.create_publisher(ShipData, pub_pos_topic, 10))
+            self.subscribers_pos.append(self.create_subscription(PoseWithCovarianceStamped, sub_pos_topic, self.create_trg_pose_callback(i), 10))
+            self.subscribers_imu.append(self.create_subscription(Imu, sub_imu_topic, self.create_trg_imu_callback(i),10))
 
     def own_pos_callback(self, data):
 
-        quaternion = (data.orientation.x, data.orientation.y, data.orientation.z, data.orientation.w)
         current_time = data.header.stamp.sec + data.header.stamp.nanosec * 1e-9
 
         linear_velocity_x = 0.0
         linear_velocity_y = 0.0
         if self.previous_own_x_pos is not None and self.previous_own_y_pos is not None and self.previous_own_time is not None:
-            time_delta = (current_time - self.previous_own_time).nanoseconds / 1e9
+            time_delta = current_time - self.previous_own_time
 
             delta_x = data.pose.pose.position.x - self.previous_own_x_pos
             delta_y = data.pose.pose.position.y - self.previous_own_y_pos
@@ -61,16 +82,15 @@ class AvoidanceScenario(Node):
             linear_velocity_x = delta_x / time_delta
             linear_velocity_y = delta_y / time_delta
 
-            self.get_logger().info("...........................")
-            self.get_logger().info("pose x: " + str(data.pose.pose.position.x))
-            self.get_logger().info("pose y: " + str(data.pose.pose.position.y))
-            self.get_logger().info("delta_x: " + str(delta_x))
-            self.get_logger().info("delta_y: " + str(delta_y))
-            self.get_logger().info("timedelta: " + str(time_delta))
+            # self.get_logger().info("...........................")
+            # self.get_logger().info("pose x: " + str(data.pose.pose.position.x))
+            # self.get_logger().info("pose y: " + str(data.pose.pose.position.y))
+            # self.get_logger().info("delta_x: " + str(delta_x))
+            # self.get_logger().info("delta_y: " + str(delta_y))
+            # self.get_logger().info("timedelta: " + str(time_delta))
 
         self.own_pose_x = data.pose.pose.position.x
         self.own_pose_y = data.pose.pose.position.y
-        self.own_theta = calculate_theta_from_quaternion(quaternion)
         self.own_vel_x = linear_velocity_x
         self.own_vel_y = linear_velocity_y
         self.own_lin_vel = math.sqrt(linear_velocity_x ** 2 + linear_velocity_y ** 2)
@@ -78,49 +98,60 @@ class AvoidanceScenario(Node):
         self.previous_own_y_pos = data.pose.pose.position.y
         self.previous_own_time = current_time
 
-        self.get_logger().info("own_theta: " + str(self.own_theta))
-        self.get_logger().info("own_lin_vel: " + str(self.own_lin_vel))
-        self.get_logger().info("linvel_x: " + str(linear_velocity_x))
-        self.get_logger().info("linvel_y: " +str(linear_velocity_y))
-        self.get_logger().info("...........................")
+        # self.get_logger().info("own_lin_vel: " + str(self.own_lin_vel))
+        # self.get_logger().info("linvel_x: " + str(linear_velocity_x))
+        # self.get_logger().info("linvel_y: " +str(linear_velocity_y))
+        # self.get_logger().info("...........................")
+
+    def own_imu_callback(self, data):
+
+        quaternion = (data.orientation.x, data.orientation.y, data.orientation.z, data.orientation.w)
+        self.own_theta = calculate_theta_from_quaternion(quaternion)
+
 
 
     def create_trg_pose_callback(self, idx):
         return lambda m: self.trg_pose_callback(m, idx)
+
+    def create_trg_imu_callback(self, idx):
+        return lambda m: self.trg_imu_callback(m, idx)
 
     def trg_pose_callback(self, data, index):
 
         trg_ship_name = "trg_ship_" + str(index)
 
         if trg_ship_name not in self.trgShipsData:
-            self.trgShipsData.setdefault(trg_ship_name, {}).update(self.createShipDataDict(data, index))
+            self.trgShipsData.setdefault(trg_ship_name, {}).update(self.createShipDataDict(index))
         else:
             self.updateShipDataDict(trg_ship_name, data)
 
         self.calculate_publish(trg_ship_name)
 
-    def createShipDataDict(self, data, index):
-        trg_pose_x = data.position.x
-        trg_pose_y = data.position.y
-        quaternion = (data.orientation.x, data.orientation.y, data.orientation.z, data.orientation.w)
-        trg_theta = calculate_theta_from_quaternion(quaternion)
+    def trg_imu_callback(self, data, index):
 
-        return {'index': index, 'trg_pose_x': trg_pose_x, 'trg_pose_y': trg_pose_y, 'trg_theta': trg_theta,
-                'trg_vel_x': None, 'trg_vel_y': None, 'previous_trg_x_pos': None, 'previous_trg_y_pos': None,
+        trg_ship_name = "trg_ship_" + str(index)
+        if trg_ship_name not in self.trgShipsData:
+            self.trgShipsData.setdefault(trg_ship_name, {}).update(self.createShipDataDict(index))
+
+        quaternion = (data.orientation.x, data.orientation.y, data.orientation.z, data.orientation.w)
+        self.trgShipsData[trg_ship_name]['trg_theta'] = calculate_theta_from_quaternion(quaternion)
+        self.get_logger().info("theta_trg: " + str(self.trgShipsData[trg_ship_name]['trg_theta']))
+
+    def createShipDataDict(self, index):
+
+        return {'index': index, 'trg_pose_x': 0.0, 'trg_pose_y': 0.0, 'trg_theta': 0.0,
+                'trg_vel_x': 0.0, 'trg_vel_y': 0.0, 'previous_trg_x_pos': None, 'previous_trg_y_pos': None,
                 'previous_trg_time': None, 'trg_lin_vel': None}
 
     def updateShipDataDict(self, trg_ship_name, data):
 
-
-        quaternion = (data.orientation.x, data.orientation.y, data.orientation.z, data.orientation.w)
         current_time = data.header.stamp.sec + data.header.stamp.nanosec * 1e-9
-
 
         if self.trgShipsData[trg_ship_name]['previous_trg_x_pos'] is not None and self.trgShipsData[trg_ship_name]['previous_trg_y_pos'] is not None and self.trgShipsData[trg_ship_name]['previous_trg_time'] is not None:
 
-            time_delta = (current_time - self.trgShipsData[trg_ship_name]['previous_trg_time']).nanoseconds / 1e9
-            delta_x = data.pose.pose.position.x - self.self.trgShipsData[trg_ship_name]['previous_trg_x_pos']
-            delta_y = data.pose.pose.position.y - self.self.trgShipsData[trg_ship_name]['previous_trg_y_pos']
+            time_delta = current_time - self.trgShipsData[trg_ship_name]['previous_trg_time']
+            delta_x = data.pose.pose.position.x - self.trgShipsData[trg_ship_name]['previous_trg_x_pos']
+            delta_y = data.pose.pose.position.y - self.trgShipsData[trg_ship_name]['previous_trg_y_pos']
             linear_velocity_x = delta_x / time_delta
             linear_velocity_y = delta_y / time_delta
 
@@ -128,9 +159,8 @@ class AvoidanceScenario(Node):
             linear_velocity_x = 0.0
             linear_velocity_y = 0.0
 
-        self.trgShipsData[trg_ship_name]['trg_pose_x'] = data.position.x
-        self.trgShipsData[trg_ship_name]['trg_pose_y'] = data.position.y
-        self.trgShipsData[trg_ship_name]['trg_theta'] = calculate_theta_from_quaternion(quaternion)
+        self.trgShipsData[trg_ship_name]['trg_pose_x'] = data.pose.pose.position.x
+        self.trgShipsData[trg_ship_name]['trg_pose_y'] = data.pose.pose.position.y
         self.trgShipsData[trg_ship_name]['trg_vel_x'] = linear_velocity_x
         self.trgShipsData[trg_ship_name]['trg_vel_y'] = linear_velocity_y
         self.trgShipsData[trg_ship_name]['trg_lin_vel'] = math.sqrt(linear_velocity_x ** 2 + linear_velocity_y ** 2)
@@ -250,7 +280,7 @@ class AvoidanceScenario(Node):
         msg.x_own = self.own_pose_x
         msg.y_own = self.own_pose_y
         msg.theta_target = self.trgShipsData[trg_ship_name]['trg_theta']
-        msg.theta_own = self.own_pose_theta
+        msg.theta_own = self.own_theta
         msg.header.stamp = self.get_clock().now().to_msg()
 
         self.publishers_[self.trgShipsData[trg_ship_name]['index']].publish(msg)
