@@ -16,7 +16,6 @@ def calculate_theta_from_quaternion(quaternion):
 
     theta = (-np.degrees(theta))
 
-
     #transfer to turtlesim angles
     if theta == 0:
         theta = theta + 90
@@ -31,7 +30,6 @@ def calculate_theta_from_quaternion(quaternion):
     elif (0<theta<90):
         theta = 90 - theta
     return theta
-
 
 class AvoidanceScenario(Node):
     def __init__(self):
@@ -57,13 +55,16 @@ class AvoidanceScenario(Node):
         self.own_ship_pos_subscriber_ = self.create_subscription(PoseWithCovarianceStamped, own_ship_pos_topic, self.own_pos_callback, 10)
         self.own_ship_imu_subscriber_ = self.create_subscription(Imu, own_ship_imu_topic,self.own_imu_callback, 10)
 
-        for i in range(1):
-            # sub_topic = "/marus_boat" + str(i + 0) + "/pos"
-            sub_pos_topic = "/marus_boat1/pos"
-            sub_imu_topic = "/marus_boat1/imu"
-            # pub_topic = "ship_data/ship_" + str(i + 1)
-            pub_pos_topic = "ship_data/ship_1"
-            self.publishers_.append(self.create_publisher(ShipData, pub_pos_topic, 10))
+        broj_trg_shipova = 1
+
+        for i in range(broj_trg_shipova):
+            sub_pos_topic = "/marus_boat" + str(i + 1) + "/pos"
+            sub_imu_topic = "/marus_boat" + str(i + 1) + "/imu"
+            # sub_pos_topic = "/marus_boat1/pos"
+            # sub_imu_topic = "/marus_boat1/imu"
+            pub_data_topic = "ship_data/ship_" + str(i + 1)
+            # pub_pos_topic = "ship_data/ship_1"
+            self.publishers_.append(self.create_publisher(ShipData, pub_data_topic, 10))
             self.subscribers_pos.append(self.create_subscription(PoseWithCovarianceStamped, sub_pos_topic, self.create_trg_pose_callback(i), 10))
             self.subscribers_imu.append(self.create_subscription(Imu, sub_imu_topic, self.create_trg_imu_callback(i),10))
 
@@ -82,13 +83,6 @@ class AvoidanceScenario(Node):
             linear_velocity_x = delta_x / time_delta
             linear_velocity_y = delta_y / time_delta
 
-            # self.get_logger().info("...........................")
-            # self.get_logger().info("pose x: " + str(data.pose.pose.position.x))
-            # self.get_logger().info("pose y: " + str(data.pose.pose.position.y))
-            # self.get_logger().info("delta_x: " + str(delta_x))
-            # self.get_logger().info("delta_y: " + str(delta_y))
-            # self.get_logger().info("timedelta: " + str(time_delta))
-
         self.own_pose_x = data.pose.pose.position.x
         self.own_pose_y = data.pose.pose.position.y
         self.own_vel_x = linear_velocity_x
@@ -98,17 +92,10 @@ class AvoidanceScenario(Node):
         self.previous_own_y_pos = data.pose.pose.position.y
         self.previous_own_time = current_time
 
-        # self.get_logger().info("own_lin_vel: " + str(self.own_lin_vel))
-        # self.get_logger().info("linvel_x: " + str(linear_velocity_x))
-        # self.get_logger().info("linvel_y: " +str(linear_velocity_y))
-        # self.get_logger().info("...........................")
-
     def own_imu_callback(self, data):
 
         quaternion = (data.orientation.x, data.orientation.y, data.orientation.z, data.orientation.w)
         self.own_theta = calculate_theta_from_quaternion(quaternion)
-
-
 
     def create_trg_pose_callback(self, idx):
         return lambda m: self.trg_pose_callback(m, idx)
@@ -135,7 +122,6 @@ class AvoidanceScenario(Node):
 
         quaternion = (data.orientation.x, data.orientation.y, data.orientation.z, data.orientation.w)
         self.trgShipsData[trg_ship_name]['trg_theta'] = calculate_theta_from_quaternion(quaternion)
-        self.get_logger().info("theta_trg: " + str(self.trgShipsData[trg_ship_name]['trg_theta']))
 
     def createShipDataDict(self, index):
 
@@ -210,10 +196,10 @@ class AvoidanceScenario(Node):
 
     def determine_collision_risk(self, trg_ship_name):
 
-        if self.trgShipsData[trg_ship_name]['tcpa'] > 0.0 and self.trgShipsData[trg_ship_name]['dcpa'] <= 1.2:
+        if self.trgShipsData[trg_ship_name]['tcpa'] > 0.0 and self.trgShipsData[trg_ship_name]['dcpa'] <= 20.0:
             print("Danger! Extreme risk of collision!")
             return True
-        elif self.trgShipsData[trg_ship_name]['tcpa'] > 0.0 and self.trgShipsData[trg_ship_name]['dcpa'] < 4.0:
+        elif self.trgShipsData[trg_ship_name]['tcpa'] > 0.0 and self.trgShipsData[trg_ship_name]['dcpa'] < 30.0:
             print("Danger! Ships on a possible collision course!")
             return False
         else:
@@ -232,7 +218,7 @@ class AvoidanceScenario(Node):
         course_trg_ship = degrees(self.trgShipsData[trg_ship_name]['trg_theta']) % 360
         if course_trg_ship < 0:
             course_trg_ship += 360
-        course_own_ship = degrees(self.own_pose_theta) % 360
+        course_own_ship = degrees(self.own_theta) % 360
         if course_own_ship < 0:
             course_own_ship += 360
 
@@ -264,8 +250,6 @@ class AvoidanceScenario(Node):
             scenario = "NO COLLISION"
 
         self.trgShipsData[trg_ship_name]['scenario'] = scenario
-
-        print(scenario)
 
     def publish_ship_data(self, trg_ship_name):
 
