@@ -215,10 +215,10 @@ class AvoidanceScenario(Node):
 
     def determine_avoidance_scenario(self, trg_ship_name):
 
-        course_trg_ship = degrees(self.trgShipsData[trg_ship_name]['trg_theta']) % 360
+        course_trg_ship = self.trgShipsData[trg_ship_name]['trg_theta'] % 360
         if course_trg_ship < 0:
             course_trg_ship += 360
-        course_own_ship = degrees(self.own_theta) % 360
+        course_own_ship = self.own_theta % 360
         if course_own_ship < 0:
             course_own_ship += 360
 
